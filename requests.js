@@ -1,57 +1,59 @@
-maxResponseTime = 300;
+// Max response time you are not expecting your endpoint to hit.
+maxResponseTime = 200;
 
 // Number of requests you want to make.
-iterations = 35;
+iterations = 20;
 
-// 100 ms is a delay between requests
-delay = 100;
+// 10 ms is a delay between requests
+delay = 0.1;
 
 responseTimes = [];
 i=0;
 
 function sendRequest() {
-    // Modify `url` and necessary `headers`
     pm.sendRequest({
-        url: '',
+        url: pm.variables.get("API_TEST_ENDPOINT"),
         method: 'GET',
         header: {
             'Accept': 'application/json',
-            'Authorization': '',
+            'Authorization': pm.variables.get("API_AUTH_KEY")
         },
-    }, function (err, res) {
-        pm.test(`Response time is ${res.responseTime} ms`, function (){
-        pm.expect(err).to.equal(null);
-        pm.expect(res).to.have.property('code', 200);
-        responseTimes.push(res.responseTime);
+    }, (err, res) => {
+        pm.test(`Response time is ${res.responseTime} ms`, () => {
+            pm.expect(err).to.equal(null);
+            pm.expect(res).to.have.property('code', 200);
+            responseTimes.push(res.responseTime);
         });
 
         if (i < iterations - 1) {
             i++;
             setTimeout(sendRequest, delay);
         } else {
-            avgResponseTime = quantile(responseTimes, 90);
-            pm.test(`Average response time is ${avgResponseTime} ms is lower than max response time: ${maxResponseTime} ms, the number of iterations is ${iterations}`, function () {
+            avgResponseTime = average(responseTimes);
+            pm.test(
+                `Average response time is ${avgResponseTime} ms is lower than max response time: ${maxResponseTime} ms, the number of iterations was ${iterations} for ${pm.variables.get("API_TEST_ENDPOINT")}`
+                , () => {
                 pm.expect(avgResponseTime).to.be.below(maxResponseTime);
             });
+
+            today = new Date();
+            dd = String(today.getDate()).padStart(2, '0');
+            mm = String(today.getMonth() + 1).padStart(2, '0');
+            yyyy = today.getFullYear();
+            today = `${mm}/${dd}/${yyyy}`;
+
+            pm.test(`Date: ${today}`);
         }
     });
 }
 
 sendRequest();
 
-function sortNumber(a,b) {
-    return a - b;
-}
-
-function quantile(array, percentile) {
-    array.sort(sortNumber);
-    index = percentile/100. * (array.length-1);
-    if (Math.floor(index) === index) {
-     result = array[index];
-    } else {
-        j = Math.floor(index)
-        fraction = index - j;
-        result = array[j] + (array[j+1] - array[j]) * fraction;
+function average(array) {
+    sum = 0;
+    for( var i = 0; i < array.length; i++ ) {
+        sum += parseInt(array[i], 10);
     }
-    return result;
+
+    return sum/array.length;
 }
